@@ -628,16 +628,20 @@ class RApiHalHal extends RApi
 
 		$model = $this->triggerFunction('loadModel', $this->elementName, $this->operationConfiguration);
 		$functionName = RApiHalHelper::attributeToString($this->operationConfiguration, 'functionName', 'save');
+
 		$data = $this->triggerFunction('processPostData', $this->options->get('data', array()), $this->operationConfiguration);
 
 		$data = $this->triggerFunction('validatePostData', $model, $data, $this->operationConfiguration);
 
-		if ($data === false)
+		var_dump($data);
+		die();
+
+		if (!empty($data))
 		{
 			// Not Acceptable
-			$this->setStatusCode(406);
+			$this->setErrorDisplay($data);
 			$this->triggerFunction('displayErrors', $model);
-			$this->setData('result', $data);
+			$this->setData('result', implode(",", $data));
 
 			return;
 		}
@@ -1265,6 +1269,7 @@ class RApiHalHal extends RApi
 				$data[$fieldAttributes['name']] = !is_null($data[$fieldAttributes['name']]) ? $data[$fieldAttributes['name']] : $fieldAttributes['defaultValue'];
 				$data[$fieldAttributes['name']] = $this->transformField($fieldAttributes['transform'], $data[$fieldAttributes['name']], false);
 				$dataFields[$fieldAttributes['name']] = $data[$fieldAttributes['name']];
+
 			}
 
 			if (RApiHalHelper::isAttributeTrue($configuration, 'strictFields'))
@@ -1296,10 +1301,12 @@ class RApiHalHal extends RApi
 		$data = (array) $data;
 		$app = JFactory::getApplication();
 
+		$checkFields = $this->checkRequiredFields($data, $configuration);
+
 		// We are checking required fields set in webservice XMLs
-		if (!$this->checkRequiredFields($data, $configuration))
+		if (!empty($checkFields))
 		{
-			return false;
+			return $checkFields;
 		}
 
 		$validateMethod = strtolower(RApiHalHelper::attributeToString($configuration, 'validateData', 'none'));
@@ -1368,6 +1375,8 @@ class RApiHalHal extends RApi
 	 */
 	public function checkRequiredFields($data, $configuration)
 	{
+		$message = array();
+
 		if (!empty($configuration->fields))
 		{
 			foreach ($configuration->fields->field as $field)
@@ -1376,14 +1385,15 @@ class RApiHalHal extends RApi
 				{
 					if (is_null($data[(string) $field['name']]) || $data[(string) $field['name']] == '')
 					{
-						JFactory::getApplication()->enqueueMessage(
-							JText::sprintf('LIB_REDCORE_API_HAL_WEBSERVICE_ERROR_REQUIRED_FIELD', (string) $field['name']), 'error'
-						);
-
-						return false;
+						$message[] = JText::sprintf('LIB_REDCORE_API_HAL_WEBSERVICE_ERROR_REQUIRED_FIELD', (string) $field['name']);
 					}
 				}
 			}
+		}
+
+		if (!empty($message))
+		{
+			return $message;
 		}
 
 		return true;
@@ -1560,7 +1570,7 @@ class RApiHalHal extends RApi
 			}
 			elseif ($response === false && $terminateIfNotAuthorized)
 			{
-				throw new Exception(JText::_('LIB_REDCORE_API_OAUTH2_SERVER_IS_NOT_ACTIVE'));
+				throw new Exception('LIB_REDCORE_API_OAUTH2_SERVER_IS_NOT_ACTIVE');
 			}
 			else
 			{
@@ -1651,7 +1661,7 @@ class RApiHalHal extends RApi
 
 		if (empty($tableName))
 		{
-			throw new Exception(JText::_('LIB_REDCORE_API_HAL_WEBSERVICE_TABLE_NAME_NOT_SET'));
+			throw new Exception('LIB_REDCORE_API_HAL_WEBSERVICE_TABLE_NAME_NOT_SET');
 		}
 
 		$context = $this->webserviceName . '.' . $this->webserviceVersion;
