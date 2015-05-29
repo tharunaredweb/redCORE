@@ -130,6 +130,12 @@ class RApiHalHal extends RApi
 	public $authorizationCheck = 'oauth2';
 
 	/**
+	 * @var    object  Array for storing operation errors
+	 * @since  1.6
+	 */
+	public $apiErrors = array();
+
+	/**
 	 * Method to instantiate the file-based api call.
 	 *
 	 * @param   mixed  $options  Optional custom options to load. JRegistry or array format
@@ -629,17 +635,16 @@ class RApiHalHal extends RApi
 		$model = $this->triggerFunction('loadModel', $this->elementName, $this->operationConfiguration);
 		$functionName = RApiHalHelper::attributeToString($this->operationConfiguration, 'functionName', 'save');
 
+		$errors = array();
+
 		$data = $this->triggerFunction('processPostData', $this->options->get('data', array()), $this->operationConfiguration);
+		$data = $this->triggerFunction('validatePostData', $model, $data, $this->operationConfiguration, $errors);
 
-		$data = $this->triggerFunction('validatePostData', $model, $data, $this->operationConfiguration);
-
-		var_dump($data);
-		die();
-
-		if (!empty($data))
+		if ($data === false)
 		{
 			// Not Acceptable
-			$this->setErrorDisplay($data);
+			$customError = $this->triggerFunction('createCustomHttpError', 406, $this->apiErrors);
+			$this->setStatusCode(406, $customError);
 			$this->triggerFunction('displayErrors', $model);
 			$this->setData('result', implode(",", $data));
 
@@ -1269,7 +1274,6 @@ class RApiHalHal extends RApi
 				$data[$fieldAttributes['name']] = !is_null($data[$fieldAttributes['name']]) ? $data[$fieldAttributes['name']] : $fieldAttributes['defaultValue'];
 				$data[$fieldAttributes['name']] = $this->transformField($fieldAttributes['transform'], $data[$fieldAttributes['name']], false);
 				$dataFields[$fieldAttributes['name']] = $data[$fieldAttributes['name']];
-
 			}
 
 			if (RApiHalHelper::isAttributeTrue($configuration, 'strictFields'))
@@ -1304,9 +1308,9 @@ class RApiHalHal extends RApi
 		$checkFields = $this->checkRequiredFields($data, $configuration);
 
 		// We are checking required fields set in webservice XMLs
-		if (!empty($checkFields))
+		if (!$checkFields)
 		{
-			return $checkFields;
+			return false;
 		}
 
 		$validateMethod = strtolower(RApiHalHelper::attributeToString($configuration, 'validateData', 'none'));
@@ -1369,13 +1373,13 @@ class RApiHalHal extends RApi
 	 * @param   array             $data           Raw Posted data
 	 * @param   SimpleXMLElement  $configuration  Configuration for displaying object
 	 *
-	 * @return  mixed  Array with posted data or false.
+	 * @return  mixed  True when validation passes, false otherwise
 	 *
 	 * @since   1.3
 	 */
 	public function checkRequiredFields($data, $configuration)
 	{
-		$message = array();
+		$errors = array();
 
 		if (!empty($configuration->fields))
 		{
@@ -1385,15 +1389,17 @@ class RApiHalHal extends RApi
 				{
 					if (is_null($data[(string) $field['name']]) || $data[(string) $field['name']] == '')
 					{
-						$message[] = JText::sprintf('LIB_REDCORE_API_HAL_WEBSERVICE_ERROR_REQUIRED_FIELD', (string) $field['name']);
+						$errors[] = JText::sprintf('LIB_REDCORE_API_HAL_WEBSERVICE_ERROR_REQUIRED_FIELD', (string) $field['name']);
 					}
 				}
 			}
 		}
 
-		if (!empty($message))
+		if (!empty($errors))
 		{
-			return $message;
+			$this->apiErrors = array_merge($this->apiErrors, $errors);
+
+			return false;
 		}
 
 		return true;

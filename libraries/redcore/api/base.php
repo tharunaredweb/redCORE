@@ -126,21 +126,6 @@ abstract class RApiBase implements RApiInterface
 	/**
 	 * Set status code for current api call
 	 *
-	 * @param   string  $errroText  Text to replace default api message
-	 *
-	 * @throws Exception
-	 * @return  RApiBase      An instance of itself for chaining
-	 */
-	public function setErrorDisplay($errroText)
-	{
-		$this->statusText = implode(',', $errroText);
-
-		return $this;
-	}
-
-	/**
-	 * Set status code for current api call
-	 *
 	 * @param   int     $statusCode  Status code
 	 * @param   string  $text        Text to replace default api message
 	 *
@@ -158,6 +143,21 @@ abstract class RApiBase implements RApiInterface
 		}
 
 		return $this;
+	}
+
+	/**
+	 * Transform a source field data value.
+	 *
+	 * Creates a custom response text error the given errors
+	 *
+	 * @param   string  $errorCode  HTTP error code
+	 * @param   array   $errors     Array with errors to be set in the message
+	 *
+	 * @return string
+	 */
+	public function createCustomHttpError($errorCode, $errors)
+	{
+		return self::$statusTexts[$errorCode] . ': ' . implode(chr('. '), $errors);
 	}
 
 	/**
